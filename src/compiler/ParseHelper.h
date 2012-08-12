@@ -43,7 +43,8 @@ struct TParseContext {
             diagnostics(is),
             directiveHandler(ext, diagnostics),
             preprocessor(&diagnostics, &directiveHandler),
-            scanner(NULL) {  }
+            scanner(NULL),
+            line(0) {  }
     TIntermediate& intermediate; // to hold and build a parse tree
     TSymbolTable& symbolTable;   // symbol table that goes with the language currently being parsed
     ShShaderType shaderType;              // vertex or fragment language (future: pack or unpack)
@@ -64,6 +65,7 @@ struct TParseContext {
     TDirectiveHandler directiveHandler;
     pp::Preprocessor preprocessor;
     void* scanner;
+    TSourceLoc line;
 
     int numErrors() const { return diagnostics.numErrors(); }
     TInfoSink& infoSink() { return diagnostics.infoSink(); }

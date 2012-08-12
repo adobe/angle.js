@@ -6,6 +6,7 @@
 
 #include "compiler/TranslatorGLSL.h"
 #include "compiler/TranslatorESSL.h"
+#include "compiler/TranslatorJS.h"
 
 //
 // This function must be provided to create the actual
@@ -20,6 +21,8 @@ TCompiler* ConstructCompiler(
         return new TranslatorGLSL(type, spec);
       case SH_ESSL_OUTPUT:
         return new TranslatorESSL(type, spec);
+      case SH_JS_OUTPUT:
+        return new TranslatorJS(type, spec);
       default:
         return NULL;
     }

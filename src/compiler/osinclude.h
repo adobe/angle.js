@@ -20,6 +20,8 @@
       defined(__GLIBC__) || defined(__GNU__) || \
       defined(__QNX__)
 #define ANGLE_OS_POSIX
+#elif defined(JS)
+#define ANGLE_OS_JS
 #else
 #error Unsupported platform.
 #endif
@@ -34,6 +36,8 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <errno.h>
+#elif defined(ANGLE_OS_JS)
+// JavaScript has no threads.
 #endif  // ANGLE_USE_NSPR
 
 
@@ -48,7 +52,7 @@ typedef PRUintn OS_TLSIndex;
 #elif defined(ANGLE_OS_WIN)
 typedef DWORD OS_TLSIndex;
 #define OS_INVALID_TLS_INDEX (TLS_OUT_OF_INDEXES)
-#elif defined(ANGLE_OS_POSIX)
+#elif defined(ANGLE_OS_POSIX) || defined(ANGLE_OS_JS)
 typedef unsigned int OS_TLSIndex;
 #define OS_INVALID_TLS_INDEX 0xFFFFFFFF
 #endif  // ANGLE_USE_NSPR
@@ -57,6 +61,7 @@ OS_TLSIndex OS_AllocTLSIndex();
 bool OS_SetTLSValue(OS_TLSIndex nIndex, void *lpvValue);
 bool OS_FreeTLSIndex(OS_TLSIndex nIndex);
 
+#if !defined(ANGLE_OS_JS)
 inline void* OS_GetTLSValue(OS_TLSIndex nIndex)
 {
     ASSERT(nIndex != OS_INVALID_TLS_INDEX);
@@ -68,5 +73,8 @@ inline void* OS_GetTLSValue(OS_TLSIndex nIndex)
     return pthread_getspecific(nIndex);
 #endif  // ANGLE_OS_WIN
 }
+#else // defined(ANGLE_OS_JS)
+void* OS_GetTLSValue(OS_TLSIndex nIndex);
+#endif
 
 #endif // __OSINCLUDE_H

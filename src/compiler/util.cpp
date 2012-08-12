@@ -11,7 +11,7 @@
 
 #ifdef _MSC_VER
     #include <locale.h>
-#else
+#elif !defined(JS)
     #include <sstream>
 #endif
 
@@ -22,6 +22,8 @@ double atof_dot(const char *str)
     double result = _atof_l(str, l);
     _free_locale(l);
     return result;
+#elif defined(JS)
+    return atof(str);
 #else
     double result;
     std::istringstream s(str);

@@ -19,6 +19,7 @@
 #include "compiler/Common.h"
 #include "compiler/Types.h"
 #include "compiler/ConstantUnion.h"
+#include "assert.h"
 
 //
 // Operators used by the high-level (parse tree) representation.

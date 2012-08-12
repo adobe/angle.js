@@ -1,0 +1,40 @@
+CC=emcc
+CFLAGS=-c -I./include -I./src -DJS=1 -DANGLE_USE_NEW_PREPROCESSOR=1
+LDFLAGS=
+SOURCES=./src/compiler/BuiltInFunctionEmulator.cpp ./src/compiler/CodeGenGLSL.cpp ./src/compiler/Compiler.cpp ./src/compiler/debug.cpp \
+	./src/compiler/depgraph/DependencyGraph.cpp ./src/compiler/depgraph/DependencyGraphBuilder.cpp ./src/compiler/depgraph/DependencyGraphOutput.cpp \
+	./src/compiler/depgraph/DependencyGraphTraverse.cpp ./src/compiler/DetectDiscontinuity.cpp ./src/compiler/DetectRecursion.cpp ./src/compiler/Diagnostics.cpp \
+	./src/compiler/DirectiveHandler.cpp ./src/compiler/ForLoopUnroll.cpp ./src/compiler/glslang_lex.cpp ./src/compiler/glslang_tab.cpp ./src/compiler/InfoSink.cpp \
+	./src/compiler/Initialize.cpp ./src/compiler/Intermediate.cpp ./src/compiler/intermOut.cpp ./src/compiler/IntermTraverse.cpp ./src/compiler/MapLongVariableNames.cpp \
+	./src/compiler/OutputESSL.cpp ./src/compiler/OutputGLSL.cpp ./src/compiler/OutputGLSLBase.cpp ./src/compiler/parseConst.cpp \
+	./src/compiler/ParseHelper.cpp ./src/compiler/preprocessor/new/Diagnostics.cpp ./src/compiler/preprocessor/new/DirectiveHandler.cpp \
+	./src/compiler/preprocessor/new/DirectiveParser.cpp ./src/compiler/preprocessor/new/ExpressionParser.cpp ./src/compiler/preprocessor/new/Input.cpp \
+	./src/compiler/preprocessor/new/Lexer.cpp ./src/compiler/preprocessor/new/Macro.cpp ./src/compiler/preprocessor/new/MacroExpander.cpp \
+	./src/compiler/preprocessor/new/Preprocessor.cpp ./src/compiler/preprocessor/new/Token.cpp ./src/compiler/preprocessor/new/Tokenizer.cpp ./src/compiler/QualifierAlive.cpp \
+	./src/compiler/RemoveTree.cpp ./src/compiler/SearchSymbol.cpp ./src/compiler/ShaderLang.cpp ./src/compiler/SymbolTable.cpp ./src/compiler/timing/RestrictFragmentShaderTiming.cpp \
+	./src/compiler/timing/RestrictVertexShaderTiming.cpp ./src/compiler/TranslatorESSL.cpp ./src/compiler/TranslatorGLSL.cpp \
+	./src/compiler/UnfoldShortCircuit.cpp ./src/compiler/util.cpp ./src/compiler/ValidateLimitations.cpp ./src/compiler/VariableInfo.cpp ./src/compiler/VersionGLSL.cpp \
+	./src/compiler/InitializeDLL.cpp ./src/compiler/PoolAlloc.cpp ./src/compiler/InitializeParseContext.cpp \
+	./src/compiler/ossource_js.cpp ./src/compiler/TranslatorJS.cpp ./src/compiler/OutputJS.cpp 
+SOURCES_C = \
+	./src/compiler/preprocessor/atom.c ./src/compiler/preprocessor/cpp.c ./src/compiler/preprocessor/cppstruct.c ./src/compiler/preprocessor/memory.c \
+	./src/compiler/preprocessor/scanner.c ./src/compiler/preprocessor/symbols.c ./src/compiler/preprocessor/tokens.c
+OUTPUT_DIR = ./js_build/
+OBJECTS=$(SOURCES:.cpp=.cpp.bc) $(SOURCES_C:.c=.c.bc)
+EXECUTABLE=angle.js
+
+all: $(SOURCES) $(EXECUTABLE)
+	
+$(EXECUTABLE): $(OBJECTS) 
+	$(CC) -O1 $(LDFLAGS) $(addprefix $(OUTPUT_DIR), $(OBJECTS)) -o $(addprefix $(OUTPUT_DIR), $@)
+
+%.cpp.bc: %.cpp
+	mkdir -p `dirname $(addprefix $(OUTPUT_DIR), $@)`
+	$(CC) -MMD -MF $(addsuffix .d, $(addprefix $(OUTPUT_DIR), $@)) -MT "$<.deps" $(CFLAGS) $< -o $(addprefix $(OUTPUT_DIR), $@)
+
+%.c.bc: %.c
+	mkdir -p `dirname $(addprefix $(OUTPUT_DIR), $@)`
+	$(CC) -MMD -MF $(addsuffix .d, $(addprefix $(OUTPUT_DIR), $@)) -MT "$<.deps" $(CFLAGS) $< -o $(addprefix $(OUTPUT_DIR), $@)
+
+clean:
+	find . -name "*.bc" | xargs rm

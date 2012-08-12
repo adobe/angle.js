@@ -77,7 +77,8 @@ typedef enum {
 typedef enum {
   SH_ESSL_OUTPUT = 0x8B45,
   SH_GLSL_OUTPUT = 0x8B46,
-  SH_HLSL_OUTPUT = 0x8B47
+  SH_HLSL_OUTPUT = 0x8B47,
+  SH_JS_OUTPUT   = 0x8B48
 } ShShaderOutput;
 
 typedef enum {

@@ -180,7 +180,7 @@ void TParseContext::error(TSourceLoc loc,
                           const char* extraInfo)
 {
     pp::SourceLocation srcLoc;
-    DecodeSourceLoc(loc, &srcLoc.file, &srcLoc.line);
+    DecodeSourceLoc(loc, &srcLoc.file, &srcLoc.line, &srcLoc.index);
     diagnostics.writeInfo(pp::Diagnostics::ERROR,
                           srcLoc, reason, token, extraInfo);
 
@@ -190,7 +190,7 @@ void TParseContext::warning(TSourceLoc loc,
                             const char* reason, const char* token,
                             const char* extraInfo) {
     pp::SourceLocation srcLoc;
-    DecodeSourceLoc(loc, &srcLoc.file, &srcLoc.line);
+    DecodeSourceLoc(loc, &srcLoc.file, &srcLoc.line, &srcLoc.index);
     diagnostics.writeInfo(pp::Diagnostics::WARNING,
                           srcLoc, reason, token, extraInfo);
 }
@@ -936,14 +936,14 @@ bool TParseContext::supportsExtension(const char* extension)
 void TParseContext::handleExtensionDirective(int line, const char* extName, const char* behavior)
 {
     pp::SourceLocation loc;
-    DecodeSourceLoc(line, &loc.file, &loc.line);
+    DecodeSourceLoc(line, &loc.file, &loc.line, &loc.index);
     directiveHandler.handleExtension(loc, extName, behavior);
 }
 
 void TParseContext::handlePragmaDirective(int line, const char* name, const char* value)
 {
     pp::SourceLocation loc;
-    DecodeSourceLoc(line, &loc.file, &loc.line);
+    DecodeSourceLoc(line, &loc.file, &loc.line, &loc.index);
     directiveHandler.handlePragma(loc, name, value);
 }
 
@@ -1440,7 +1440,7 @@ TIntermTyped* TParseContext::addConstStruct(TString& identifier, TIntermTyped* n
     return typedNode;
 }
 
-bool TParseContext::enterStructDeclaration(int line, const TString& identifier)
+bool TParseContext::enterStructDeclaration(TSourceLoc line, const TString& identifier)
 {
     ++structNestingLevel;
 

@@ -12,16 +12,17 @@ namespace pp
 
 struct SourceLocation
 {
-    SourceLocation() : file(0), line(0) { }
-    SourceLocation(int f, int l) : file(f), line(l) { }
+    SourceLocation() : file(0), line(0), index(0) { }
+    SourceLocation(int f, int l, int i) : file(f), line(l), index(i) { }
 
     bool equals(const SourceLocation& other) const
     {
-        return (file == other.file) && (line == other.line);
+        return (file == other.file) && (line == other.line) && (index == other.index);
     }
 
     int file;
     int line;
+    int index;
 };
 
 inline bool operator==(const SourceLocation& lhs, const SourceLocation& rhs)

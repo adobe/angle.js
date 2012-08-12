@@ -68,6 +68,7 @@ typedef int16_t flex_int16_t;
 typedef uint16_t flex_uint16_t;
 typedef int32_t flex_int32_t;
 typedef uint32_t flex_uint32_t;
+typedef uint64_t flex_uint64_t;
 #else
 typedef signed char flex_int8_t;
 typedef short int flex_int16_t;
@@ -191,24 +192,16 @@ typedef void* yyscan_t;
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #endif
 
+#ifndef YY_TYPEDEF_YY_SIZE_T
+#define YY_TYPEDEF_YY_SIZE_T
+typedef size_t yy_size_t;
+#endif
+
 #define EOB_ACT_CONTINUE_SCAN 0
 #define EOB_ACT_END_OF_FILE 1
 #define EOB_ACT_LAST_MATCH 2
 
-    /* Note: We specifically omit the test for yy_rule_can_match_eol because it requires
-     *       access to the local variable yy_act. Since yyless() is a macro, it would break
-     *       existing scanners that call yyless() from OUTSIDE yylex. 
-     *       One obvious solution it to make yy_act a global. I tried that, and saw
-     *       a 5% performance hit in a non-yylineno scanner, because yy_act is
-     *       normally declared as a register variable-- so it is not worth it.
-     */
-    #define  YY_LESS_LINENO(n) \
-            do { \
-                int yyl;\
-                for ( yyl = n; yyl < yyleng; ++yyl )\
-                    if ( yytext[yyl] == '\n' )\
-                        --yylineno;\
-            }while(0)
+    #define YY_LESS_LINENO(n)
     
 /* Return all but the first "n" matched characters back to the input stream. */
 #define yyless(n) \
@@ -225,11 +218,6 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 	while ( 0 )
 
 #define unput(c) yyunput( c, yyg->yytext_ptr , yyscanner )
-
-#ifndef YY_TYPEDEF_YY_SIZE_T
-#define YY_TYPEDEF_YY_SIZE_T
-typedef size_t yy_size_t;
-#endif
 
 #ifndef YY_STRUCT_YY_BUFFER_STATE
 #define YY_STRUCT_YY_BUFFER_STATE
@@ -248,7 +236,7 @@ struct yy_buffer_state
 	/* Number of characters read into yy_ch_buf, not including EOB
 	 * characters.
 	 */
-	int yy_n_chars;
+	yy_size_t yy_n_chars;
 
 	/* Whether we "own" the buffer - i.e., we know we created it,
 	 * and can realloc() it to grow it, and should free() it to
@@ -327,7 +315,7 @@ static void yy_init_buffer (YY_BUFFER_STATE b,FILE *file ,yyscan_t yyscanner );
 
 YY_BUFFER_STATE yy_scan_buffer (char *base,yy_size_t size ,yyscan_t yyscanner );
 YY_BUFFER_STATE yy_scan_string (yyconst char *yy_str ,yyscan_t yyscanner );
-YY_BUFFER_STATE yy_scan_bytes (yyconst char *bytes,int len ,yyscan_t yyscanner );
+YY_BUFFER_STATE yy_scan_bytes (yyconst char *bytes,yy_size_t len ,yyscan_t yyscanner );
 
 void *yyalloc (yy_size_t ,yyscan_t yyscanner );
 void *yyrealloc (void *,yy_size_t ,yyscan_t yyscanner );
@@ -378,7 +366,7 @@ static void yy_fatal_error (yyconst char msg[] ,yyscan_t yyscanner );
  */
 #define YY_DO_BEFORE_ACTION \
 	yyg->yytext_ptr = yy_bp; \
-	yyleng = (size_t) (yy_cp - yy_bp); \
+	yyleng = (yy_size_t) (yy_cp - yy_bp); \
 	yyg->yy_hold_char = *yy_cp; \
 	*yy_cp = '\0'; \
 	yyg->yy_c_buf_p = yy_cp;
@@ -771,18 +759,6 @@ static yyconst flex_int16_t yy_chk[749] =
       458,  458,  458,  458,  458,  458,  458,  458
     } ;
 
-/* Table of booleans, true if rule could match eol. */
-static yyconst flex_int32_t yy_rule_can_match_eol[156] =
-    {   0,
-0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,     };
-
 /* The intent behind this definition is that it'll catch
  * any uses of REJECT which flex missed.
  */
@@ -816,7 +792,7 @@ WHICH GENERATES THE GLSL ES LEXER (glslang_lex.cpp).
 #pragma warning(disable : 4102)
 #endif
 
-#define YY_USER_ACTION yylval->lex.line = yylineno;
+#define YY_USER_ACTION yylval->lex.line = yyget_extra(yyscanner)->line;
 #define YY_INPUT(buf, result, max_size) \
     result = string_input(buf, max_size, yyscanner);
 
@@ -843,8 +819,8 @@ struct yyguts_t
     size_t yy_buffer_stack_max; /**< capacity of stack. */
     YY_BUFFER_STATE * yy_buffer_stack; /**< Stack as an array. */
     char yy_hold_char;
-    int yy_n_chars;
-    int yyleng_r;
+    yy_size_t yy_n_chars;
+    yy_size_t yyleng_r;
     char *yy_c_buf_p;
     int yy_init;
     int yy_start;
@@ -897,7 +873,7 @@ FILE *yyget_out (yyscan_t yyscanner );
 
 void yyset_out  (FILE * out_str ,yyscan_t yyscanner );
 
-int yyget_leng (yyscan_t yyscanner );
+yy_size_t yyget_leng (yyscan_t yyscanner );
 
 char *yyget_text (yyscan_t yyscanner );
 
@@ -966,7 +942,7 @@ static int input (yyscan_t yyscanner );
 	if ( YY_CURRENT_BUFFER_LVALUE->yy_is_interactive ) \
 		{ \
 		int c = '*'; \
-		int n; \
+		yy_size_t n; \
 		for ( n = 0; n < max_size && \
 			     (c = getc( yyin )) != EOF && c != '\n'; ++n ) \
 			buf[n] = (char) c; \
@@ -1122,18 +1098,6 @@ yy_find_action:
 		yy_act = yy_accept[yy_current_state];
 
 		YY_DO_BEFORE_ACTION;
-
-		if ( yy_act != YY_END_OF_BUFFER && yy_rule_can_match_eol[yy_act] )
-			{
-			int yyl;
-			for ( yyl = 0; yyl < yyleng; ++yyl )
-				if ( yytext[yyl] == '\n' )
-					   
-    do{ yylineno++;
-        yycolumn=0;
-    }while(0)
-;
-			}
 
 do_action:	/* This label is used only to access EOF actions. */
 
@@ -1550,7 +1514,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 101:
 YY_RULE_SETUP
-{ context->error(yylineno, "Invalid Octal number.", yytext); context->recover(); return 0;}
+{ context->error(context->line, "Invalid Octal number.", yytext); context->recover(); return 0;}
 	YY_BREAK
 case 102:
 YY_RULE_SETUP
@@ -1772,7 +1736,7 @@ case YY_STATE_EOF(FIELDS):
 	YY_BREAK
 case 154:
 YY_RULE_SETUP
-{ context->warning(yylineno, "Unknown char", yytext, ""); return 0; }
+{ context->warning(context->line, "Unknown char", yytext, ""); return 0; }
 	YY_BREAK
 case 155:
 YY_RULE_SETUP
@@ -1963,7 +1927,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 
 	else
 		{
-			int num_to_read =
+			yy_size_t num_to_read =
 			YY_CURRENT_BUFFER_LVALUE->yy_buf_size - number_to_move - 1;
 
 		while ( num_to_read <= 0 )
@@ -1977,7 +1941,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 
 			if ( b->yy_is_our_buffer )
 				{
-				int new_size = b->yy_buf_size * 2;
+				yy_size_t new_size = b->yy_buf_size * 2;
 
 				if ( new_size <= 0 )
 					b->yy_buf_size += b->yy_buf_size / 8;
@@ -2008,7 +1972,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 
 		/* Read in more data. */
 		YY_INPUT( (&YY_CURRENT_BUFFER_LVALUE->yy_ch_buf[number_to_move]),
-			yyg->yy_n_chars, (size_t) num_to_read );
+			yyg->yy_n_chars, num_to_read );
 
 		YY_CURRENT_BUFFER_LVALUE->yy_n_chars = yyg->yy_n_chars;
 		}
@@ -2133,7 +2097,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 
 		else
 			{ /* need more input */
-			int offset = yyg->yy_c_buf_p - yyg->yytext_ptr;
+			yy_size_t offset = yyg->yy_c_buf_p - yyg->yytext_ptr;
 			++yyg->yy_c_buf_p;
 
 			switch ( yy_get_next_buffer( yyscanner ) )
@@ -2157,7 +2121,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 				case EOB_ACT_END_OF_FILE:
 					{
 					if ( yywrap(yyscanner ) )
-						return EOF;
+						return 0;
 
 					if ( ! yyg->yy_did_buffer_switch_on_eof )
 						YY_NEW_FILE;
@@ -2178,13 +2142,6 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
 	c = *(unsigned char *) yyg->yy_c_buf_p;	/* cast for 8-bit char's */
 	*yyg->yy_c_buf_p = '\0';	/* preserve yytext */
 	yyg->yy_hold_char = *++yyg->yy_c_buf_p;
-
-	if ( c == '\n' )
-		   
-    do{ yylineno++;
-        yycolumn=0;
-    }while(0)
-;
 
 	return c;
 }
@@ -2420,7 +2377,7 @@ void yypop_buffer_state (yyscan_t yyscanner)
  */
 static void yyensure_buffer_stack (yyscan_t yyscanner)
 {
-	int num_to_alloc;
+	yy_size_t num_to_alloc;
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
 	if (!yyg->yy_buffer_stack) {
@@ -2518,12 +2475,11 @@ YY_BUFFER_STATE yy_scan_string (yyconst char * yystr , yyscan_t yyscanner)
  * @param yyscanner The scanner object.
  * @return the newly allocated buffer state object.
  */
-YY_BUFFER_STATE yy_scan_bytes  (yyconst char * yybytes, int  _yybytes_len , yyscan_t yyscanner)
+YY_BUFFER_STATE yy_scan_bytes  (yyconst char * yybytes, yy_size_t  _yybytes_len , yyscan_t yyscanner)
 {
 	YY_BUFFER_STATE b;
 	char *buf;
-	yy_size_t n;
-	int i;
+	yy_size_t n, i;
     
 	/* Get memory for full buffer, including space for trailing EOB's. */
 	n = _yybytes_len + 2;
@@ -2673,7 +2629,7 @@ FILE *yyget_out  (yyscan_t yyscanner)
 /** Get the length of the current token.
  * @param yyscanner The scanner object.
  */
-int yyget_leng  (yyscan_t yyscanner)
+yy_size_t yyget_leng  (yyscan_t yyscanner)
 {
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
     return yyleng;
@@ -2970,20 +2926,20 @@ void CPPDebugLogMsg(const char *msg)
 void CPPWarningToInfoLog(const char *msg)
 {
     SETUP_CONTEXT(cpp);
-    context->warning(yylineno, msg, "");
+    context->warning(context->line, msg, "");
 }
 
 void CPPShInfoLogMsg(const char *msg)
 {
     SETUP_CONTEXT(cpp);
-    context->error(yylineno, msg, "");
+    context->error(context->line, msg, "");
     context->recover();
 }
 
 void CPPErrorToInfoLog(const char *msg)
 {
     SETUP_CONTEXT(cpp);
-    context->error(yylineno, msg, "");
+    context->error(context->line, msg, "");
     context->recover();
 }
 
@@ -2991,23 +2947,25 @@ void SetLineNumber(int line)
 {
     SETUP_CONTEXT(cpp);
     int string = 0;
-    DecodeSourceLoc(yylineno, &string, NULL);
-    yylineno = EncodeSourceLoc(string, line);
+    int index = 0;
+    DecodeSourceLoc(context->line, &string, NULL, &index);
+    context->line = EncodeSourceLoc(string, line, index);
 }
 
 void SetStringNumber(int string)
 {
     SETUP_CONTEXT(cpp);
     int line = 0;
-    DecodeSourceLoc(yylineno, NULL, &line);
-    yylineno = EncodeSourceLoc(string, line);
+    int index = 0;
+    DecodeSourceLoc(context->line, NULL, &line, &index);
+    context->line = EncodeSourceLoc(string, line, index);
 }
 
 int GetStringNumber()
 {
     SETUP_CONTEXT(cpp);
     int string = 0;
-    DecodeSourceLoc(yylineno, &string, NULL);
+    DecodeSourceLoc(context->line, &string, NULL, NULL);
     return string;
 }
 
@@ -3015,24 +2973,24 @@ int GetLineNumber()
 {
     SETUP_CONTEXT(cpp);
     int line = 0;
-    DecodeSourceLoc(yylineno, NULL, &line);
+    DecodeSourceLoc(context->line, NULL, &line, NULL);
     return line;
 }
 
 void IncLineNumber()
 {
     SETUP_CONTEXT(cpp);
-    int string = 0, line = 0;
-    DecodeSourceLoc(yylineno, &string, &line);
-    yylineno = EncodeSourceLoc(string, ++line);
+    int string = 0, line = 0, index = 0;
+    DecodeSourceLoc(context->line, &string, &line, &index);
+    context->line = EncodeSourceLoc(string, ++line, index);
 }
 
 void DecLineNumber()
 {
     SETUP_CONTEXT(cpp);
-    int string = 0, line = 0;
-    DecodeSourceLoc(yylineno, &string, &line);
-    yylineno = EncodeSourceLoc(string, --line);
+    int string = 0, line = 0, index = 0;
+    DecodeSourceLoc(context->line, &string, &line, &index);
+    context->line = EncodeSourceLoc(string, --line, index);
 }
 
 void HandlePragma(const char **tokens, int numTokens)
@@ -3043,7 +3001,7 @@ void HandlePragma(const char **tokens, int numTokens)
     if (strcmp(tokens[1], "(") != 0) return;
     if (strcmp(tokens[3], ")") != 0) return;
 
-    context->handlePragmaDirective(yylineno, tokens[0], tokens[2]);
+    context->handlePragmaDirective(context->line, tokens[0], tokens[2]);
 }
 
 void StoreStr(const char *string)
@@ -3071,7 +3029,7 @@ void ResetTString(void)
 void updateExtensionBehavior(const char* extName, const char* behavior)
 {
     SETUP_CONTEXT(cpp);
-    context->handleExtensionDirective(yylineno, extName, behavior);
+    context->handleExtensionDirective(context->line, extName, behavior);
 }
 }  // extern "C"
 
@@ -3084,7 +3042,7 @@ int string_input(char* buf, int max_size, yyscan_t yyscanner) {
     len = token.type == pp::Token::LAST ? 0 : token.text.size();
     if ((len > 0) && (len < max_size))
         memcpy(buf, token.text.c_str(), len);
-    yyset_lineno(EncodeSourceLoc(token.location.file, token.location.line),yyscanner);
+    yyget_extra(yyscanner)->line = EncodeSourceLoc(token.location.file, token.location.line, token.location.index);
 #else
     len = yylex_CPP(buf, max_size);
 #endif  // ANGLE_USE_NEW_PREPROCESSOR
@@ -3115,7 +3073,7 @@ int check_type(yyscan_t yyscanner) {
 int reserved_word(yyscan_t yyscanner) {
     struct yyguts_t* yyg = (struct yyguts_t*) yyscanner;
 
-    yyextra->error(yylineno, "Illegal use of reserved word", yytext, "");
+    yyextra->error(yyextra->line, "Illegal use of reserved word", yytext, "");
     yyextra->recover();
     return 0;
 }
@@ -3124,9 +3082,9 @@ void yyerror(TParseContext* context, const char* reason) {
     struct yyguts_t* yyg = (struct yyguts_t*) context->scanner;
 
     if (context->AfterEOF) {
-        context->error(yylineno, reason, "unexpected EOF");
+        context->error(context->line, reason, "unexpected EOF");
     } else {
-        context->error(yylineno, reason, yytext);
+        context->error(context->line, reason, yytext);
     }
     context->recover();
 }
@@ -3156,7 +3114,7 @@ int glslang_finalize(TParseContext* context) {
 int glslang_scan(int count, const char* const string[], const int length[],
                  TParseContext* context) {
     yyrestart(NULL,context->scanner);
-    yyset_lineno(EncodeSourceLoc(0, 1),context->scanner);
+    yyset_lineno(EncodeSourceLoc(0, 1, 1),context->scanner);
     context->AfterEOF = false;
 
     // Initialize preprocessor.

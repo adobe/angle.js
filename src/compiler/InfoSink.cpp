@@ -32,14 +32,11 @@ void TInfoSinkBase::prefix(TPrefixType message) {
 }
 
 void TInfoSinkBase::location(TSourceLoc loc) {
-    int string = 0, line = 0;
-    DecodeSourceLoc(loc, &string, &line);
+    int string = 0, line = 0, index = 0;
+    DecodeSourceLoc(loc, &string, &line, &index);
 
     TPersistStringStream stream;
-    if (line)
-        stream << string << ":" << line;
-    else
-        stream << string << ":? ";
+    stream << index;
     stream << ": ";
 
     sink.append(stream.str());

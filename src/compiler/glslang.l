@@ -47,7 +47,7 @@ WHICH GENERATES THE GLSL ES LEXER (glslang_lex.cpp).
 #pragma warning(disable : 4102)
 #endif
 
-#define YY_USER_ACTION yylval->lex.line = yylineno;
+#define YY_USER_ACTION yylval->lex.line = yyget_extra(yyscanner)->line;
 #define YY_INPUT(buf, result, max_size) \
     result = string_input(buf, max_size, yyscanner);
 
@@ -57,7 +57,7 @@ static int reserved_word(yyscan_t yyscanner);
 %}
 
 %option noyywrap nounput never-interactive
-%option yylineno reentrant bison-bridge
+%option reentrant bison-bridge
 %option stack
 %option extra-type="TParseContext*"
 %x COMMENT FIELDS
@@ -205,7 +205,7 @@ O           [0-7]
 
 0[xX]{H}+         { yylval->lex.i = strtol(yytext, 0, 0); return(INTCONSTANT); }
 0{O}+             { yylval->lex.i = strtol(yytext, 0, 0); return(INTCONSTANT); }
-0{D}+             { context->error(yylineno, "Invalid Octal number.", yytext); context->recover(); return 0;}
+0{D}+             { context->error(context->line, "Invalid Octal number.", yytext); context->recover(); return 0;}
 {D}+              { yylval->lex.i = strtol(yytext, 0, 0); return(INTCONSTANT); }
 
 {D}+{E}           { yylval->lex.f = static_cast<float>(atof_dot(yytext)); return(FLOATCONSTANT); }
@@ -268,7 +268,7 @@ O           [0-7]
 
 [ \t\v\n\f\r]   {  }
 <*><<EOF>>      { context->AfterEOF = true; yyterminate(); }
-<*>.            { context->warning(yylineno, "Unknown char", yytext, ""); return 0; }
+<*>.            { context->warning(context->line, "Unknown char", yytext, ""); return 0; }
 
 %%
 
@@ -294,20 +294,20 @@ void CPPDebugLogMsg(const char *msg)
 void CPPWarningToInfoLog(const char *msg)
 {
     SETUP_CONTEXT(cpp);
-    context->warning(yylineno, msg, "");
+    context->warning(context->line, msg, "");
 }
 
 void CPPShInfoLogMsg(const char *msg)
 {
     SETUP_CONTEXT(cpp);
-    context->error(yylineno, msg, "");
+    context->error(context->line, msg, "");
     context->recover();
 }
 
 void CPPErrorToInfoLog(const char *msg)
 {
     SETUP_CONTEXT(cpp);
-    context->error(yylineno, msg, "");
+    context->error(context->line, msg, "");
     context->recover();
 }
 
@@ -315,23 +315,25 @@ void SetLineNumber(int line)
 {
     SETUP_CONTEXT(cpp);
     int string = 0;
-    DecodeSourceLoc(yylineno, &string, NULL);
-    yylineno = EncodeSourceLoc(string, line);
+    int index = 0;
+    DecodeSourceLoc(context->line, &string, NULL, &index);
+    context->line = EncodeSourceLoc(string, line, index);
 }
 
 void SetStringNumber(int string)
 {
     SETUP_CONTEXT(cpp);
     int line = 0;
-    DecodeSourceLoc(yylineno, NULL, &line);
-    yylineno = EncodeSourceLoc(string, line);
+    int index = 0;
+    DecodeSourceLoc(context->line, NULL, &line, &index);
+    context->line = EncodeSourceLoc(string, line, index);
 }
 
 int GetStringNumber()
 {
     SETUP_CONTEXT(cpp);
     int string = 0;
-    DecodeSourceLoc(yylineno, &string, NULL);
+    DecodeSourceLoc(context->line, &string, NULL, NULL);
     return string;
 }
 
@@ -339,24 +341,24 @@ int GetLineNumber()
 {
     SETUP_CONTEXT(cpp);
     int line = 0;
-    DecodeSourceLoc(yylineno, NULL, &line);
+    DecodeSourceLoc(context->line, NULL, &line, NULL);
     return line;
 }
 
 void IncLineNumber()
 {
     SETUP_CONTEXT(cpp);
-    int string = 0, line = 0;
-    DecodeSourceLoc(yylineno, &string, &line);
-    yylineno = EncodeSourceLoc(string, ++line);
+    int string = 0, line = 0, index = 0;
+    DecodeSourceLoc(context->line, &string, &line, &index);
+    context->line = EncodeSourceLoc(string, ++line, index);
 }
 
 void DecLineNumber()
 {
     SETUP_CONTEXT(cpp);
-    int string = 0, line = 0;
-    DecodeSourceLoc(yylineno, &string, &line);
-    yylineno = EncodeSourceLoc(string, --line);
+    int string = 0, line = 0, index = 0;
+    DecodeSourceLoc(context->line, &string, &line, &index);
+    context->line = EncodeSourceLoc(string, --line, index);
 }
 
 void HandlePragma(const char **tokens, int numTokens)
@@ -367,7 +369,7 @@ void HandlePragma(const char **tokens, int numTokens)
     if (strcmp(tokens[1], "(") != 0) return;
     if (strcmp(tokens[3], ")") != 0) return;
 
-    context->handlePragmaDirective(yylineno, tokens[0], tokens[2]);
+    context->handlePragmaDirective(context->line, tokens[0], tokens[2]);
 }
 
 void StoreStr(const char *string)
@@ -395,7 +397,7 @@ void ResetTString(void)
 void updateExtensionBehavior(const char* extName, const char* behavior)
 {
     SETUP_CONTEXT(cpp);
-    context->handleExtensionDirective(yylineno, extName, behavior);
+    context->handleExtensionDirective(context->line, extName, behavior);
 }
 }  // extern "C"
 
@@ -408,7 +410,7 @@ int string_input(char* buf, int max_size, yyscan_t yyscanner) {
     len = token.type == pp::Token::LAST ? 0 : token.text.size();
     if ((len > 0) && (len < max_size))
         memcpy(buf, token.text.c_str(), len);
-    yyset_lineno(EncodeSourceLoc(token.location.file, token.location.line), yyscanner);
+    yyget_extra(yyscanner)->line = EncodeSourceLoc(token.location.file, token.location.line, token.location.index);
 #else
     len = yylex_CPP(buf, max_size);
 #endif  // ANGLE_USE_NEW_PREPROCESSOR
@@ -439,7 +441,7 @@ int check_type(yyscan_t yyscanner) {
 int reserved_word(yyscan_t yyscanner) {
     struct yyguts_t* yyg = (struct yyguts_t*) yyscanner;
 
-    yyextra->error(yylineno, "Illegal use of reserved word", yytext, "");
+    yyextra->error(yyextra->line, "Illegal use of reserved word", yytext, "");
     yyextra->recover();
     return 0;
 }
@@ -448,9 +450,9 @@ void yyerror(TParseContext* context, const char* reason) {
     struct yyguts_t* yyg = (struct yyguts_t*) context->scanner;
 
     if (context->AfterEOF) {
-        context->error(yylineno, reason, "unexpected EOF");
+        context->error(context->line, reason, "unexpected EOF");
     } else {
-        context->error(yylineno, reason, yytext);
+        context->error(context->line, reason, yytext);
     }
     context->recover();
 }
@@ -480,7 +482,7 @@ int glslang_finalize(TParseContext* context) {
 int glslang_scan(int count, const char* const string[], const int length[],
                  TParseContext* context) {
     yyrestart(NULL, context->scanner);
-    yyset_lineno(EncodeSourceLoc(0, 1), context->scanner);
+    yyset_lineno(EncodeSourceLoc(0, 1, 1), context->scanner);
     context->AfterEOF = false;
 
     // Initialize preprocessor.

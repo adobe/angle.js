@@ -60,6 +60,7 @@ typedef pp::SourceLocation YYLTYPE;
         }                                                           \
         yylloc->file = yyfileno;                                    \
         yylloc->line = yylineno;                                    \
+        yylloc->index = scanLoc->cIndex;                            \
         scanLoc->cIndex += yyleng;                                  \
     } while(0);
 
@@ -249,12 +250,13 @@ FRACTIONAL_CONSTANT  ({DIGIT}*"."{DIGIT}+)|({DIGIT}+".")
     }
     yylloc->file = yyfileno;
     yylloc->line = yylineno;
+    yylloc->index = scanLoc->cIndex;
     yylval->clear();
 
     if (YY_START == COMMENT)
     {
         yyextra->diagnostics->report(pp::Diagnostics::EOF_IN_COMMENT,
-                                     pp::SourceLocation(yyfileno, yylineno),
+                                     pp::SourceLocation(yyfileno, yylineno, yylloc->index),
                                      "");
     }
     yyterminate();

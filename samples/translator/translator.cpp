@@ -106,6 +106,7 @@ int main(int argc, char* argv[])
                     case 'e': output = SH_ESSL_OUTPUT; break;
                     case 'g': output = SH_GLSL_OUTPUT; break;
                     case 'h': output = SH_HLSL_OUTPUT; break;
+                    case 'j': output = SH_JS_OUTPUT; break;
                     default: failCode = EFailUsage;
                     }
                 } else {

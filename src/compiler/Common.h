@@ -20,17 +20,31 @@
 // line number while the rest store the string number. Since the shaders are
 // usually small, we should not run out of memory. SOURCE_LOC_LINE_SIZE
 // can be increased to alleviate this issue.
-typedef int TSourceLoc;
-const unsigned int SOURCE_LOC_LINE_SIZE = 16;  // in bits.
-const unsigned int SOURCE_LOC_LINE_MASK = (1 << SOURCE_LOC_LINE_SIZE) - 1;
+typedef uint32_t TSourceLoc;
 
-inline TSourceLoc EncodeSourceLoc(int string, int line) {
-    return (string << SOURCE_LOC_LINE_SIZE) | (line & SOURCE_LOC_LINE_MASK);
+union TSourceLocDecoder {
+    TSourceLoc encoded;
+    struct {
+        //uint16_t line;
+        //uint16_t string;
+        uint32_t index;
+    } decoded;
+};
+
+inline TSourceLoc EncodeSourceLoc(int string, int line, int index) {
+    TSourceLocDecoder decoder;
+    decoder.decoded.index = index;
+//    decoder.decoded.string = string & ((1 << 16) - 1);
+//    decoder.decoded.line = line & ((1 << 16) - 1);
+    return decoder.encoded;
 }
 
-inline void DecodeSourceLoc(TSourceLoc loc, int* string, int* line) {
-    if (string) *string = loc >> SOURCE_LOC_LINE_SIZE;
-    if (line) *line = loc & SOURCE_LOC_LINE_MASK;
+inline void DecodeSourceLoc(TSourceLoc loc, int* string, int* line, int* index) {
+    TSourceLocDecoder decoder;
+    decoder.encoded = loc;
+    if (string) *string = 0; //decoder.decoded.string;
+    if (line) *line = 0; //decoder.decoded.line;
+    if (index) *index = decoder.decoded.index;
 }
 
 //
