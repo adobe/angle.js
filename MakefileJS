@@ -20,21 +20,25 @@ SOURCES_C = \
 	./src/compiler/preprocessor/atom.c ./src/compiler/preprocessor/cpp.c ./src/compiler/preprocessor/cppstruct.c ./src/compiler/preprocessor/memory.c \
 	./src/compiler/preprocessor/scanner.c ./src/compiler/preprocessor/symbols.c ./src/compiler/preprocessor/tokens.c
 OUTPUT_DIR = ./js_build/
-OBJECTS=$(SOURCES:.cpp=.cpp.bc) $(SOURCES_C:.c=.c.bc)
-EXECUTABLE=angle.js
+OBJECTS=$(addprefix $(OUTPUT_DIR), $(SOURCES:.cpp=.cpp.bc) $(SOURCES_C:.c=.c.bc))
+EXECUTABLE=$(OUTPUT_DIR)angle.js
 
 all: $(SOURCES) $(EXECUTABLE)
 	
 $(EXECUTABLE): $(OBJECTS) 
-	$(CC) -O1 $(LDFLAGS) $(addprefix $(OUTPUT_DIR), $(OBJECTS)) -o $(addprefix $(OUTPUT_DIR), $@)
+	$(CC) -O1 $(LDFLAGS) $(OBJECTS) -o $@
 
-%.cpp.bc: %.cpp
-	mkdir -p `dirname $(addprefix $(OUTPUT_DIR), $@)`
-	$(CC) -MMD -MF $(addsuffix .d, $(addprefix $(OUTPUT_DIR), $@)) -MT "$<.deps" $(CFLAGS) $< -o $(addprefix $(OUTPUT_DIR), $@)
+$(OUTPUT_DIR)%.cpp.bc: %.cpp
+	mkdir -p `dirname "$@"`
+	$(CC) -MMD -MF "$@.d" -MT "$@ $<.deps" $(CFLAGS) "$<" -o "$@"
 
-%.c.bc: %.c
-	mkdir -p `dirname $(addprefix $(OUTPUT_DIR), $@)`
-	$(CC) -MMD -MF $(addsuffix .d, $(addprefix $(OUTPUT_DIR), $@)) -MT "$<.deps" $(CFLAGS) $< -o $(addprefix $(OUTPUT_DIR), $@)
+$(OUTPUT_DIR)%.c.bc: %.c
+	mkdir -p `dirname "$@"`
+	$(CC) -MMD -MF "$@.d" -MT "$@ $<.deps" $(CFLAGS) "$<" -o "$@"
 
 clean:
 	find . -name "*.bc" | xargs rm
+
+.PHONY: clean all
+
+-include $(OBJECTS:%=%.d)
