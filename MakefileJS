@@ -23,10 +23,14 @@ OUTPUT_DIR = ./js_build/
 OBJECTS=$(addprefix $(OUTPUT_DIR), $(SOURCES:.cpp=.cpp.bc) $(SOURCES_C:.c=.c.bc))
 EXECUTABLE=$(OUTPUT_DIR)angle.js
 
+EXPORTED_FUNCTIONS="['_ShInitialize', '_ShInitBuiltInResources', '_ShConstructCompiler', '_ShCompile', '_ShFinalize', '_ShGetInfo', '_ShGetObjectCode', '_ShGetInfoLog']"
+
 all: $(SOURCES) $(EXECUTABLE)
 	
-$(EXECUTABLE): $(OBJECTS) 
-	$(CC) -O1 $(LDFLAGS) $(OBJECTS) -o $@
+$(EXECUTABLE): $(OBJECTS) ./html/js/worker.js
+	$(CC) -O1 --llvm-opts 3 --closure 0 --minify 0 $(LDFLAGS) $(OBJECTS) --post-js ./html/js/worker.js -o $@ -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS)
+	# The following needs closure compiler and just whitespace works.
+	# java -Xmx1024m -jar closure-compiler/compiler.jar --js js_build/angle.js --js_output_file js_build/angle.closure.js --compilation_level WHITESPACE_ONLY
 
 $(OUTPUT_DIR)%.cpp.bc: %.cpp
 	mkdir -p `dirname "$@"`

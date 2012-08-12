@@ -1,0 +1,1104 @@
+
+<style>
+#code_view {
+	line-height: 1.5em;
+}
+
+.inline-overlay {
+	display: inline-block;
+	position: relative;
+}
+
+.inline-box { 
+	width: 10px;
+	height: 10px;
+	background-color: red;
+	border-radius: 10px;
+}
+
+.inline-error {
+	background-color: red;
+}
+.inline-info {
+	background-color: #ccc;
+	border-radius: 2px;
+}
+.inline-info:hover {
+	color: white;
+	background-color: blue;
+}
+
+.inline-overlay div {
+	color: black;
+	display: none;
+	position: absolute;
+	background-color: white;
+	padding: 5px;
+	top: 1.5em;
+	border: 1px solid #ccc;
+	border-radius: 5px;
+	width: 350px;
+	z-index: 200;
+	white-space: normal;
+	font-family: Arial;
+}
+.inline-overlay:hover div {
+	display: block;
+}
+
+#boxes {
+	width: 500px;
+	height: 500px;
+	border: 1px solid blue;
+	position: relative;
+}
+
+.select-box {
+	background-color: blue;
+	margin-left: -5px;
+	margin-top: -5px;
+	width: 10px;
+	height: 10px;
+}
+
+.select-box:hover {
+	background-color: red;
+}
+
+.select-box.selected {
+	background-color: green;
+}
+</style>
+<script type="text/javascript" src="js/jquery-1.7.2.min.js"></script>
+<script>
+var predefinedTypes = {
+	"gl_Position": {
+		"type": "vec4",
+		"options": {},
+		"scope": "global"
+	}
+};
+
+var actions = {
+	"variables": function(program, item) {
+		var variable = [],
+			variableType = action(program, item[1]),
+			symbols = actionList(program, item[2]);
+		var init = [],
+			scope = program.variables[variableType.scope],
+			scopeByName = program.variables[variableType.scope + "ByName"];
+		for (var i = 0; i < symbols.length; ++i) {
+			var symbol = symbols[i];
+			symbol.type = variableType;
+			if (symbol.init)
+				init.push({
+					fn: "initSymbol",
+					symbol: symbol
+				});
+			scope.push(symbol);
+			scopeByName[symbol.name] = symbol;
+		}
+		return init.length ? init : null;
+	},
+
+	"init": function(program, item) {
+		var symbol = action(program, item[1]),
+			value = action(program, item[2]);
+		symbol.init = value;
+		return symbol;
+	},
+
+	"constant": function(program, item) {
+		var constantValue = {
+			symbol: null,
+			constant: true,
+			type: action(program, item[1]),
+			value: item[2]
+		};
+		constantValue.type.scope = "constant";
+		return constantValue;
+	},
+
+	"symbol": function(program, item) {
+		var id = item[1];
+		var symbol = {
+			id: id,
+			name: item[2],
+			type: predefinedTypes[item[2]],
+			stringStart: item[3]
+		};
+		symbol.symbol = symbol;
+
+		if (symbol.type) {
+			program.variables[symbol.type.scope].push(symbol);
+			program.variables[symbol.type.scope + "ByName"][symbol.name] = symbol;
+		}
+
+		var oldSymbol = program.variablesById[id];
+		if (!oldSymbol)
+			program.variablesById[id] = symbol;
+		else
+			symbol.type = oldSymbol.type;
+		return symbol;
+	},
+
+	"type": function(program, item) {
+		return {
+			"type": item[1],
+			"options": item[2],
+			"scope": "local"
+		};
+	},
+
+	"varType": function(program, item) {
+		var type = action(program, item[2]);
+		type.scope = item[1];
+		return type;
+	},
+
+	"declareFunction": function(program, item) {
+		// do nothing for now.
+	},
+
+	"defineFunction": function(program, item) {
+		var fn = {
+			returnType: action(program, item[1]),
+			name: item[2],
+			parameters: actionList(program, item[3]),
+			body: action(program, item[4])
+		};
+		program.functions.push(fn);
+		program.functionsLookup["_" + fn.name] = fn;
+	},
+
+	"call": function(program, item) {
+		return {
+			fn: "call",
+			fnName: item[1],
+			parameters: actionList(program, item, 2, true)
+		};
+	},
+
+	"index": function(program, item) {
+		var value = action(program, item[1]),
+			index = action(program, item[2]),
+			swizzleValue = {
+				symbol: value.symbol,
+				constant: value.constant,
+				type: swizzleType(value.type, "x"),
+				value: value,
+				index: index
+			};
+		return swizzleValue;
+	},
+
+	"swizzle": function(program, item) {
+		var value = action(program, item[2]),
+			swizzleValue = {
+				symbol: value.symbol,
+				constant: value.constant,
+				type: swizzleType(value.type, item[1]),
+				value: value,
+				swizzle: item[1]
+			};
+		return swizzleValue;
+	},
+
+	"parameter": function(program, item) {
+		// FIXME: Implement.
+	},
+
+	"constant_struct": function(program, item) {
+		// FIXME: Implement.
+	},
+
+	"struct": function(program, item) {
+		// FIXME: Implement.
+	},
+
+	"construct": function(program, item) {
+		// FIXME: Implement.
+	},
+
+	"block": function(program, list) {
+		return actionList(program, list, 1);
+	},
+
+	"line": function(program, item) {
+		return action(program, item[1]);
+	}
+}
+
+function action(program, item) {
+	if (!item)
+		return null;
+	var action = item[0],
+		actionFn = actions[action];
+	if (!actionFn) {
+		console.log("default action", action);
+		var result = {
+			fn: item[0],
+			parameters: actionList(program, item, 1, true)
+		};
+		if (result.parameters && result.parameters.length)
+			result.type = result.parameters[0].type;
+		return result;
+	}
+	return actionFn(program, item);
+}
+
+function actionList(program, list, startIndex, addAll) {
+	if (!startIndex) startIndex = 0;
+	var result = [];
+	// Ignore first item -> "block";
+	for (var i = startIndex; i < list.length; ++i) {
+		var item = action(program, list[i]);
+		if (item || addAll)
+			result.push(item);
+	}
+	return result;
+}
+
+function build(programSource) {
+	var program = {
+		variables: {
+			uniform: [],
+			uniformByName: {},
+			local: [],
+			localByName: {},
+			varying: [],
+			varyingByName: {},
+			attribute: [],
+			attributeByName: {},
+			global: [],
+			globalByName: {}
+		},
+		variablesById: {},
+		functions: [],
+		functionsLookup: {}
+	};
+	program.body = action(program, programSource);
+	return program;
+}
+
+function mathState(callback) { 
+	return function(state, item) {
+		var val = getValue(state, item.parameters[0])
+		return itemOperation1(val, callback);
+	}
+}
+
+function extendState(count, type) {
+	return function(state, item) {
+		var valList = getListValue(state, item.parameters)
+		var resultValue = [];
+		for (var i = 0; i < valList.length; ++i) {
+			var val = valList[i].value;
+			if (!val)
+				continue;
+			for (var j = 0; j < val.length; ++j)
+				resultValue.push(val[j]);
+		}
+		for (var i = resultValue.length; i < count; ++i)
+			resultValue.push(resultValue[resultValue.length - 1]);
+		return {
+			type: {
+				"type": type,
+				"options": {},
+				"scope": "local"
+			},
+			value: resultValue
+		};
+	}
+}
+
+var runtimeActions = {
+
+	"initSymbol": function(state, item) {
+		var val = getValue(state, item.symbol.init);
+		if (val) {
+			state.variableValues[item.symbol.id] = val.value;
+			state.pushVarOverlay(item.symbol, cloneArray(val.value), "init");
+		}
+	},
+
+	"call": function(state, item) {
+		var params = getListValue(state, item.parameters);
+		switch (item.fnName) {
+			case "print":
+				console.log(params);
+				return null;
+		}
+		return {
+			value: [0]
+		};
+	},
+
+	"sin": mathState(Math.sin),
+	"cos": mathState(Math.cos),
+	"float": extendState(1, "float"),
+	"vec2": extendState(2, "vec2"),
+	"vec3": extendState(3, "vec3"),
+	"vec4": extendState(4, "vec4"),
+
+	"int": extendState(1, "int"),
+	"ivec2": extendState(2, "ivec2"),
+	"ivec3": extendState(3, "ivec3"),
+	"ivec4": extendState(4, "ivec4"),
+
+	"mat2": extendState(4, "mat2"),
+	"mat3": extendState(9, "mat3"),
+	"mat4": extendState(16, "mat4"),
+
+	"=": function(state, item) {
+		return setValue(state, item.parameters[0], getValue(state, item.parameters[1]));
+	},
+
+	"*=": function(state, item) {
+		var rightVal = getValue(state, item.parameters[1]),  
+			leftVal = getValue(state, item.parameters[0])
+		return setValue(state, item.parameters[0], multiply(leftVal, rightVal));
+	},
+
+	"-=": function(state, item) {
+		var rightVal = getValue(state, item.parameters[1]),  
+			leftVal = getValue(state, item.parameters[0])
+		return setValue(state, item.parameters[0], itemOperation(leftVal, rightVal, function(a, b) {
+			return a - b;
+		}));
+	},
+
+	"+=": function(state, item) {
+		var rightVal = getValue(state, item.parameters[1]),  
+			leftVal = getValue(state, item.parameters[0])
+		return setValue(state, item.parameters[0], itemOperation(leftVal, rightVal, function(a, b) {
+			return a + b;
+		}));
+	},
+
+	"/=": function(state, item) {
+		var rightVal = getValue(state, item.parameters[1]),  
+			leftVal = getValue(state, item.parameters[0])
+		return setValue(state, item.parameters[0], itemOperation(leftVal, rightVal, function(a, b) {
+			return a / b;
+		}));
+	},
+
+	"/": function(state, item) {
+		return itemOperation(getValue(state, item.parameters[0]), getValue(state, item.parameters[1]), function(a, b) {
+			return a / b;
+		});
+	},
+
+	"+": function(state, item) {
+		return itemOperation(getValue(state, item.parameters[0]), getValue(state, item.parameters[1]), function(a, b) {
+			return a + b;
+		});
+	},
+
+	"*": function(state, item) {
+		var a = getValue(state, item.parameters[0]), 
+			b = getValue(state, item.parameters[1]); 
+		return multiply(a, b);
+	},
+
+	"-": function(state, item) {
+		return itemOperation(getValue(state, item.parameters[0]), getValue(state, item.parameters[1]), function(a, b) {
+			return a - b;
+		});
+	},
+
+	"negative": function(state, item) {
+		return itemOperation1(getValue(state, item.parameters[0]), function(a) {
+			return -a;
+		});
+	},
+
+	">": function(state, item) {
+		return itemOperation(getValue(state, item.parameters[0]), getValue(state, item.parameters[1]), function(a, b) {
+			return a > b;
+		});
+	},
+
+	"<": function(state, item) {
+		return itemOperation(getValue(state, item.parameters[0]), getValue(state, item.parameters[1]), function(a, b) {
+			return a < b;
+		});
+	},
+
+	">=": function(state, item) {
+		return itemOperation(getValue(state, item.parameters[0]), getValue(state, item.parameters[1]), function(a, b) {
+			return a >= b;
+		});
+	},
+
+	"<=": function(state, item) {
+		return itemOperation(getValue(state, item.parameters[0]), getValue(state, item.parameters[1]), function(a, b) {
+			return a <= b;
+		});
+	},
+
+	"if_value": function(state, item) {
+		var value = getValue(state, item.parameters[0]);
+		if (value.value[0])
+			return getValue(state, item.parameters[1]);
+		return getValue(state, item.parameters[2]);
+	},
+
+	"if": function(state, item) {
+		var value = getValue(state, item.parameters[0]);
+		if (value.value[0])
+			execItem(state, item.parameters[1]);
+		else
+			execItem(state, item.parameters[2]);
+	},
+
+};
+
+function dotProduct(a, b) {
+	var x = 0;
+	for (var i = 0; i < a.length; ++i)
+		x += a[i] * b[i % b.length];
+	return x;
+}
+
+var simpleTypes = {
+	"float": {
+		type: "vec",
+		sizeA: 1,
+		sizeB: 1
+	},
+	"int": {
+		type: "ivec",
+		sizeA: 1,
+		sizeB: 1
+	}
+};
+
+function parseType(typeName) {
+	var type = typeName.match(/([^\d]+)(\d)x?(\d)?/);
+	if (!type)
+		return simpleTypes[typeName];
+	var type = {
+		type: type[1],
+		sizeA: parseInt(type[2]), // Columns
+		sizeB: type[3] ? parseInt(type[3]) : parseInt(type[2]) // Rows
+	};
+	if (type.type != "mat")
+		type.sizeA = 1;
+	return type;
+}
+
+function multiplyVecLeft(a, b, type2) {
+	var r = [];
+	for (var i = 0; i < a.value.length; ++i) {
+		var s = 0;
+		for (var y = i * type2.sizeB, j = 0; y < b.value.length && j < a.value.length; ++y, ++j) {
+			s += a.value[j] * b.value[y];
+		}
+		r.push(s);
+	}
+	return {
+		type: a.type,
+		value: r
+	};
+}
+
+function multiplyVecRight(a, type1, b) {
+	var r = [];
+	for (var i = 0; i < b.value.length; ++i) {
+		var s = 0;
+		for (var x = i, j = 0; x < a.value.length; x += type1.sizeB, ++j) {
+			s += a.value[x] * b.value[j];
+		}
+		r.push(s);
+	}
+	return {
+		type: a.type,
+		value: r
+	};
+}
+
+function multiply(a, b) {
+	var type1 = parseType(a.type.type),
+		type2 = parseType(b.type.type);
+	if ((type1.sizeA == type1.sizeB && type1.sizeA == 1)
+		|| (type2.sizeA == type2.sizeB && type2.sizeA == 1))
+		return componentMultiply(a, b);
+	if (type1.type == "vec")
+		return multiplyVecLeft(a, b, type2)
+	if (type2.type == "vec")
+		return multiplyVecRight(a, type1, b)
+	if (type1.sizeA != type2.sizeB) {
+		console.error("Invalid type multiply", type1, type2);
+		return null;
+	}
+	var resultType = {
+		type: type1.type,
+		sizeA: type2.sizeB,
+		sizeB: type1.sizeA
+	}
+	var r = [];
+	for (var i = 0; i < resultType.sizeA; ++i) {
+		for (var j = 0; j < resultType.sizeB; ++j) {
+			var s = 0;
+			// start from the right line, advance by the number of lines, so that we got the next column same line
+			for (var x = j; x < a.value.length; x += type1.sizeB) {
+				// start 
+				for (var y = i * type2.sizeB; y < b.value.length; ++y)
+					s += a.value[x] * b.value[y];
+			}
+			r.push(s);
+		}
+	}
+	return {
+		value: r,
+		type: {
+			"type": resultType.type + resultType.sizeA + (resultType.sizeA != resultType.sizeB ? "x" + resultType.sizeB : ""),
+			"options": {},
+			"scope": "local"
+		}
+	}
+}
+
+function componentMultiply(a, b) {
+	return itemOperation(a, b, function(a, b) {
+		return a * b;
+	});
+}
+
+function itemOperation(item1, item2, callback) {
+	var result = [];
+	for (var i = 0; i < item1.value.length; ++i)
+		result.push(callback(item1.value[i], item2.value[i % item2.value.length]));
+	return {
+		type: item1.type,
+		value: result
+	};
+}
+
+function itemOperation1(item1, callback) {
+	var result = [];
+	for (var i = 0; i < item1.value.length; ++i)
+		result.push(callback(item1.value[i]));
+	return {
+		type: item1.type,
+		value: result
+	};
+}
+
+function cloneArray(array) {
+	var result = [];
+	for (var i = 0; i < array.length; ++i)
+		result.push(array[i]);
+	return result;
+}
+
+function getValue(state, val) {
+	if (!val)
+		return;
+	if (val.fn)
+		return getValue(state, execItem(state, val));
+	if (val.index)
+		return getIndex(state, val);
+	if (val.swizzle)
+		return swizzle(state, val);
+	if (Array.isArray(val.value))
+		return val;
+	if (val.symbol) {
+		state.pushVarOverlay(val.symbol, cloneArray(state.variableValues[val.symbol.id]), "get value");
+		return {
+			type: val.symbol.type,
+			value: state.variableValues[val.symbol.id]
+		};
+	}
+	return getValue(state, val.value);
+}
+
+function getListValue(state, list) {
+	var result = [];
+	for (var i = 0; i < list.length; ++i)
+		result.push(getValue(state, list[i]));
+	return result;
+}
+
+function setValue(state, lVal, newVal) {
+	if (!newVal) {
+		state.pushVarOverlay(lVal.symbol, ["Undefined value"], "error set value");
+		return;
+	}
+	if (lVal.fn)
+		lVal = execItem(state, lVal);
+	
+	if (lVal.index)
+		setIndexValue(state, lVal, newVal);
+	else if (lVal.swizzle)
+		setSwizzleValue(state, lVal, newVal);
+	else if (lVal.symbol) {
+		state.pushVarOverlay(lVal.symbol, cloneArray(newVal.value), "set value");
+		state.variableValues[lVal.symbol.id] = newVal.value;
+	}
+	return newVal;
+}
+
+function getIndex(state, lVal) {
+	var val = getValue(state, lVal.value),
+		index = getValue(state, lVal.index);
+	state.pushVarOverlay(lVal.symbol, cloneArray(state.variableValues[lVal.symbol.id]), "get index value");
+	return {
+		type: lVal.symbol.type,
+		value: [state.variableValues[lVal.symbol.id][index.value[0]]]
+	};
+}
+
+function setIndexValue(state, lVal, newVal) {
+	var val = getValue(state, lVal.value),
+		index = getValue(state, lVal.index);
+	if (!lVal.symbol)
+		return;
+	state.variableValues[lVal.symbol.id][index.value[0]] = newVal.value[0];
+	state.pushVarOverlay(lVal.symbol, cloneArray(state.variableValues[lVal.symbol.id]), "set index value");
+}
+
+var swizzleItems = {
+	"x": 0,
+	"y": 1,
+	"z": 2,
+	"w": 3
+};
+
+var swizzleToString = ["x", "y", "z", "w"];
+
+function swizzle(state, val) {
+	var value = getValue(state, val.value).value;
+	var result = [];
+	for (var i = 0; i < val.swizzle.length; ++i) {
+		var item = swizzleItems[val.swizzle.charAt(i)];
+		result.push(value[item]);
+	}
+	return {
+		type: val.type,
+		value: result
+	};
+}
+
+function swizzleType(type, swizzle) {
+	var newType = {
+		"type": type.type ? (type.type.substr(0, type.type.length - 1) + swizzle.length) : null,
+		"options": type.options
+	};
+	if (newType.type == "ivec1")
+		newType.type = "int";
+	else if (newType.type == "bvec1")
+		newType.type = "bool";
+	else if (newType.type == "vec1")
+		newType.type = "float";
+	return newType;
+}
+
+function determineRealSwizzleValue(val) {
+	var items = val.value.swizzle ? determineRealValue(val.value) : null,
+		result = [];
+	for (var i = 0; i < val.swizzle.length; ++i) {
+		var item = swizzleItems[val.swizzle.charAt(i)];
+		if (!items)
+			result.push(item);
+		else
+			result.push(items[item]);
+	}
+	return result;
+}
+
+function setSwizzleValue(state, lVal, newVal) {
+	// Clone the result first as the result might be the source.
+	var value = cloneArray(state.variableValues[lVal.symbol.id]),
+		items = determineRealSwizzleValue(lVal);
+	for (var i = 0; i < items.length; ++i)
+		value[items[i]] = newVal.value[i];
+	state.variableValues[lVal.symbol.id] = value;
+	state.pushVarOverlay(lVal.symbol, cloneArray(value), "set swizzle value");
+}
+
+function execItem(state, item) {
+	if (Array.isArray(item))
+		return getListValue(state, item);
+	var fn = runtimeActions[item.fn];
+	if (!fn) {
+		console.error("No implementation for " + item.fn, item);
+		return;
+	}
+	return fn(state, item);
+}
+
+function execList(state, list) {
+	for (var i = 0; i < list.length; ++i)
+		execItem(state, list[i]);
+}
+
+function fillEmptyArray(count) {
+	var r = [];
+	for (var i = 0; i < count; ++i)
+		r.push(0);
+	return r;
+}
+
+var valuesByType = {
+	"float": fillEmptyArray(1),
+	"vec2": fillEmptyArray(2),
+	"vec3": fillEmptyArray(3),
+	"vec4": fillEmptyArray(4),
+	"int": fillEmptyArray(1),
+	"ivec2": fillEmptyArray(2),
+	"ivec3": fillEmptyArray(3),
+	"ivec4": fillEmptyArray(4),
+
+	"mat4": fillEmptyArray(4 * 4),
+	"mat4x4": fillEmptyArray(4 * 4),
+	"mat4x3": fillEmptyArray(4 * 3),
+	"mat4x2": fillEmptyArray(4 * 2),
+	
+	"mat3": fillEmptyArray(3 * 3),
+	"mat3x3": fillEmptyArray(3 * 3),
+	"mat3x4": fillEmptyArray(3 * 4),
+	"mat3x2": fillEmptyArray(3 * 2),
+	
+	"mat2": fillEmptyArray(2 * 2),
+	"mat2x4": fillEmptyArray(2 * 4),
+	"mat2x3": fillEmptyArray(2 * 3),
+	"mat2x2": fillEmptyArray(2 * 2),
+};
+
+function makeValue(type) {
+	return cloneArray(valuesByType[type]);
+}
+
+function initDefaultVars(state, list, defaults) {
+	for (var i = 0; i < list.length; ++i) {
+		var varType = list[i];
+		state.variableValues[varType.id] = defaults[varType.name] || makeValue(varType.type.type);
+		state.pushVarOverlay(varType.symbol, state.variableValues[varType.id], "init default");
+	}
+}
+
+function runtime(program, options) {
+	var state = {
+		variableValues: {},
+		overlays: options.overlays,
+		pushVarOverlay: function(token, newValue, where) {
+			if (!this.overlays)
+				return;
+			var overlay = {
+				index: token.stringStart,
+				endIndex: token.stringStart + token.name.length,
+				className: "inline-info",
+				el: $("<div />").html(newValue.join("<br />")),
+				where: where
+			};
+			this.overlays.push(overlay);
+		}
+	};
+	
+	initDefaultVars(state, program.variables['uniform'], options);
+	initDefaultVars(state, program.variables['attribute'], options);
+	initDefaultVars(state, program.variables['varying'], options);
+	initDefaultVars(state, program.variables['local'], options);
+	initDefaultVars(state, program.variables['global'], options);
+
+	var main = program.functionsLookup._css_main;
+	if (!main)
+		return;
+	execList(state, main.body);
+	return state;
+}
+
+function parseErrors(errorsString) {
+	var errors = [],
+		match,
+		parser = /^(\w*):\s(\d*):(.*)/gm;
+	while((match = parser.exec(errorsString)) !== null) {
+		errors.push({
+			type: match[1],
+			index: parseInt(match[2]),
+			error: match[3]
+		});
+	}
+	return errors;
+}
+
+function pushOverlays(overlays, source) {
+	var code_view = $("#code_view").empty(),
+		lastIndex = 0;
+
+	overlays.sort(function(a, b) {
+		return a.index - b.index;
+	});
+
+	function pushLines(max) {
+		if (max !== undefined && max < lastIndex)
+			return false;
+		var substr = source.substring(lastIndex, max);
+		lastIndex += substr.length;
+		return $("<span />").appendTo(code_view).text(substr);
+	}
+
+	for (var i = 0; i < overlays.length; ++i) {
+		for (; i < overlays.length - 1; ++i) {
+			if (overlays[i].index < overlays[i + 1].index)
+				break;
+		}
+		if (!pushLines(overlays[i].index))
+			continue;
+		if (overlays[i].endIndex === undefined) {
+			code_view.append(overlays[i].el.addClass("inline-overlay"));
+			continue;
+		}
+		var el = pushLines(overlays[i].endIndex);
+		el.append(overlays[i].el).addClass("inline-overlay").addClass(overlays[i].className);
+	}
+	pushLines();				
+}
+
+var selectedPoint = {x: 0, y: 0};
+var mesh = {
+	w: 10,
+	h: 10
+};
+var compiledProgram = null;
+var source = "";
+
+function drawCanvas() {
+	if (!compiledProgram)
+		return;
+	var canvas = document.getElementById("canvas");
+	var ctx = canvas.getContext("2d");
+	var w = canvas.width,
+		h = canvas.height;
+	ctx.clearRect(0, 0, w, h);
+
+	var distance = {
+		w: 1 / mesh.w,
+		h: 1 / mesh.h
+	};
+
+	var gl_PositionSymbol = compiledProgram.variables.globalByName['gl_Position'];
+	if (!gl_PositionSymbol)
+		return;
+
+	var gl_PositionId = gl_PositionSymbol.id;
+
+	var points = [];
+	var slider1 = [$("#slider1").val()];
+	var slider2 = [$("#slider2").val()];
+	var slider3 = [$("#slider3").val()];
+	for (var i = 0; i <= mesh.w; ++i) {
+		for (var j = 0; j <= mesh.h; ++j) {
+			var state = runtime(compiledProgram, {
+				a_meshCoord: [i * distance.w - 0.5, j * distance.h - 0.5, 0.0, 1.0],
+				slider1: slider1,
+				slider2: slider2,
+				slider3: slider3
+			});
+			points.push(state.variableValues[gl_PositionId]);
+		}
+	}
+
+	ctx.fillStyle = "red";
+	for (var i = 0; i < points.length; ++i) {
+		var p = points[i],
+			x = (p[0] + 0.5) * w,
+			y = (p[1] + 0.5) * h;
+		ctx.fillRect(x - 3, y - 3, 6, 6);
+	}
+}
+
+function runPoint() {
+	if (!compiledProgram)
+		return;
+	var overlays = [],
+		distance = {
+			w: 1 / mesh.w,
+			h: 1 / mesh.h
+		};
+	var slider1 = [$("#slider1").val()];
+	var slider2 = [$("#slider2").val()];
+	var slider3 = [$("#slider3").val()];
+	var state = runtime(compiledProgram, {
+		overlays: overlays,
+		a_meshCoord: [selectedPoint.x * distance.w - 0.5, selectedPoint.y * distance.h - 0.5, 0.0, 1.0],
+		slider1: slider1,
+		slider2: slider2,
+		slider3: slider3
+	});
+	pushOverlays(overlays, source);
+}
+
+function makeBoxes() {
+	var el = $("#boxes");
+	var w = 500, h = 500,
+		dw = w / mesh.w, dh = h / mesh.h;
+	for (var i = 0; i <= mesh.w; ++i) {
+		for (var j = 0; j <= mesh.h; ++j) {
+			var box = $("<div class='select-box' />")
+				.css("position", "absolute")
+				.css("left", i * dw + "px")
+				.css("top", j * dh + "px")
+				.appendTo(el).click((function(i, j) {
+					return function() {
+						$(".select-box").removeClass("selected");
+						$(this).addClass("selected");
+						selectedPoint.x = i;
+						selectedPoint.y = j;
+						runPoint();
+					}
+				})(i, j));
+		}
+	}
+}
+
+var worker;
+window.onload = function() {
+	makeBoxes();
+	var xhr = new XMLHttpRequest();
+	xhr.onreadystatechange = function() {
+		if (xhr.readyState == 4 && xhr.status == 200) {
+			console.log("load finished");
+			var oBuilder = new WebKitBlobBuilder();
+			oBuilder.append(xhr.responseText);
+			
+			worker = new Worker(webkitURL.createObjectURL(oBuilder.getBlob())); 
+			worker.onmessage = function() {
+				switch (event.data.type) {
+					case 'result':
+						var overlays = [];
+						if (event.data.result.source.length) {
+							var programSource = [];
+							try { 
+								programSource = JSON.parse(event.data.result.source);
+							} catch (e) { 
+								console.error(e);
+							}
+						}
+						var errors = parseErrors(event.data.result.info);
+						if (errors.length) {
+							for (var i = 0; i < errors.length; ++i) {
+								var error = errors[i];
+								overlays.push({
+									index: error.index,
+									el: $("<span class='inline-box inline-error' />").append($("<div />").text(error.type + ": " + error.error))
+								});
+							}
+							pushOverlays(overlays, event.data.result.original);
+						} else {
+							source = event.data.result.original;
+							compiledProgram = build(programSource);
+							drawCanvas();
+							runPoint();
+						}
+						document.getElementById('result').value = event.data.result.source;
+						document.getElementById('info').value = event.data.result.info;
+						break;
+					case 'loaded':
+						document.getElementById('loading').style.display = "none";
+						update();
+						break;
+					case 'error':
+						console.log(event.data.value);
+						break;
+				}
+			}
+			worker.postMessage("");
+		}
+	}
+	xhr.open("GET", "../js_build/angle.myclosure.js", true);
+	xhr.send();
+	console.log("load started", xhr);
+}
+
+var oldSource = null;
+function update() {
+	if (!worker)
+		return;
+	var source = document.getElementById('source').value;
+	if (oldSource == source)
+		return;
+	oldSource = source;
+	worker.postMessage({type: "compile", source: source});
+}
+
+var timer = 0;
+function throtle() {
+	clearTimeout(timer);
+	setTimeout(update, 100);
+}
+
+</script>
+
+<div id="loading">Loading ANGLE thread...</div>
+
+<div>
+
+<textarea style="float: left" id="source" rows=40 cols=40 onkeydown="throtle()">
+attribute vec4 a_meshCoord;
+uniform float slider1;
+uniform float slider2;
+uniform float slider3;
+void main()
+{
+float perspective = - 1.0 / 1.5;
+    mat4 persp = mat4(
+	1.0, 0.0, 0.0, 0.0, 
+	0.0, 1.0, 0.0, 0.0, 
+	0.0, 0.0, 1.0, perspective, 
+	0.0, 0.0, 0.0, 1.0);
+
+	float f = slider1 * 3.14 / 100.0;
+	mat4 rotateX = mat4(
+	1.0, 0.0, 0.0, 0.0, 
+	0.0, cos(f), sin(f), 0.0, 
+	0.0, -sin(f), cos(f), 0.0, 
+	0.0, 0.0, 0.0, 1.0);
+
+	f = slider2 * 3.14 / 100.0;
+	mat4 rotateY = mat4(
+		cos(f), 0.0, -sin(f), 0.0, 
+		0.0, 1.0, 0.0, 0.0, 
+		sin(f), 0, cos(f), 0.0, 
+		0.0, 0.0, 0.0, 1.0);
+
+	f = slider3 * 3.14 / 100.0;
+	mat4 rotateZ = mat4(
+     cos(f), sin(f), 0.0, 0.0, 
+     -sin(f), cos(f), 0.0, 0.0, 
+     0.0, 0.0, 1.0, 0.0,
+     0.0, 0.0, 0.0, 1.0);
+
+	gl_Position = a_meshCoord * perspective * rotateX * rotateY * rotateZ;
+}
+</textarea>
+
+<input type='range' value="0" min="0" max="100" id="slider1" onchange="drawCanvas(); //runPoint();" />
+<input type='range' value="0" min="0" max="100" id="slider2" onchange="drawCanvas(); //runPoint();" />
+<input type='range' value="0" min="0" max="100" id="slider3" onchange="drawCanvas(); //runPoint();" />
+
+<pre style="float: left; width: 300px; margin-left: 10px;" id="code_view">
+</pre>
+
+<div style="float: left; width: 300px" id="variables"></div>
+
+<div style="float:left">
+	<canvas id="canvas" style="border: 1px solid green" width="500" height="500"></canvas>
+</div>
+
+<div style="float:left" id="boxes">
+</div>
+
+
+<br style="clear: left" />
+</div>
+
+<textarea id="result" rows=40 cols=40>
+</textarea>
+
+<textarea id="info" rows=40 cols=40>
+</textarea>
+
