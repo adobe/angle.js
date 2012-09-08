@@ -27,9 +27,9 @@ EXPORTED_FUNCTIONS="['_ShInitialize', '_ShInitBuiltInResources', '_ShConstructCo
 
 all: $(SOURCES) $(EXECUTABLE)
 	
-$(EXECUTABLE): $(OBJECTS) ./html/js/worker.js
-	$(CC) -O1 --llvm-opts 3 --closure 0 --minify 0 $(LDFLAGS) $(OBJECTS) --post-js ./html/js/worker.js -o $@ -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS)
-	# The following needs closure compiler and just whitespace works.
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) -O1 --llvm-opts 3 --closure 0 --minify 0 $(LDFLAGS) $(OBJECTS) --pre-js src/js/license.js -o $@ -s EXPORTED_FUNCTIONS=$(EXPORTED_FUNCTIONS)
+	# The following needs closure compiler and for now just whitespace minification works.
 	# java -Xmx1024m -jar closure-compiler/compiler.jar --js js_build/angle.js --js_output_file js_build/angle.closure.js --compilation_level WHITESPACE_ONLY
 
 $(OUTPUT_DIR)%.cpp.bc: %.cpp
